@@ -1,0 +1,4 @@
+*.pyc
+docs/_build/
+.DS_Store
+settings_dev.py
