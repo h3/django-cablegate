@@ -1,0 +1,230 @@
+<!--+
+    |
+    |           +===========================+
+    |           |   Timeline Build System   |
+    |           +===========================+
+    |
+    | This is just for bundling and minifying javascript and CSS files.
+    |
+    +-->
+
+<project default="compile" basedir="." name="Timeline">
+
+  <property name="version" value="pre_2.4.0" />      <!-- For trunk versions, use style pre_2.4.0 -->
+  <property name="local_example_ver" value="1.0" />
+  <property name="full_dest" value="dist/timeline_${version}" />
+  <property name="min_dest" value="htdocs/timeline_${version}" />
+  
+  <property name="timeline_api" value="src/webapp/api" />
+  <property name="ajax_api" value="src/ajax/api"   />
+  <property name="timeline_compilations" value="src/webapp/api/compilations" />
+  
+  <target name="tasks">
+    <taskdef name="jsmin"
+        classname="edu.mit.simile.jsminTask.JSMinTask"
+        classpath="tools/jsmin-task/jsminTask.jar"/>
+  </target>
+    
+  <target name="parameterized-bundle" depends="tasks">
+
+    <!-- SimileAjax -->
+    
+    <jsmin output="src/ajax/api/simile-ajax-bundle${suffix}.js" obfuscate="${obfuscate}">
+        <fileset dir="src/ajax/api/scripts">
+            <include name="jquery*.js" />
+            <include name="platform.js" />
+        </fileset>
+        <fileset dir="src/ajax/api/scripts">
+            <include name="**/*.js" />
+            <exclude name="signal.js" />
+            <exclude name="jquery*.js" />
+            <exclude name="platform.js" />
+        </fileset>
+    </jsmin>
+  	
+  	<!-- Timeline -->
+  	
+    <jsmin output="src/webapp/api/timeline-bundle${suffix}.js" obfuscate="${obfuscate}">
+        <fileset dir="src/webapp/api/scripts">
+        	<include name="*.js" />
+        </fileset>
+  	</jsmin>
+  	
+    <concat destfile="src/webapp/api/timeline-bundle${suffix}.css">
+        <fileset dir="src/webapp/api/styles">
+        	<include name="**/*.css" />
+        </fileset>
+    </concat>
+  </target>
+  
+  <target name="bundle" depends="tasks">
+    <antcall target="parameterized-bundle">
+      <param name="obfuscate" value="true" />
+      <param name="suffix" value="" />
+    </antcall>
+    <antcall target="parameterized-bundle">
+      <param name="obfuscate" value="false" />
+      <param name="suffix" value="-debug" />
+    </antcall>
+  </target>
+  
+  <target name="compile-ajax">
+    <jsmin output="${ajax_api}/compilations/simile-ajax-compilation${suffix}.js" obfuscate="${obfuscate}">
+        <fileset file="${ajax_api}/compile-prolog.js" />
+        <fileset file="${ajax_api}/simile-ajax-api.js" />
+        <fileset file="${ajax_api}/simile-ajax-bundle${suffix}.js" />
+        <fileset file="${ajax_api}/compile-epilog.js" />
+    </jsmin>
+    <concat destfile="${ajax_api}/compilations/simile-ajax-compilation${suffix}.css">
+        <fileset dir="${ajax_api}/styles">
+        	<include name="**/*.css" />
+        </fileset>
+    </concat>
+  </target>
+  
+  <target name="compile-timeline">
+    <jsmin output="${timeline_compilations}/timeline-${locale}-compilation${suffix}.js" obfuscate="${obfuscate}">
+        <fileset file="${timeline_api}/compile-prolog.js" />
+        <fileset file="${timeline_api}/timeline-api.js" />
+        <fileset file="${timeline_api}/timeline-bundle${suffix}.js" />
+        <fileset dir="${timeline_api}/scripts/l10n/${locale}">
+            <include name="*.js" />
+        </fileset>
+        <fileset file="${timeline_api}/compile-epilog.js" />
+    </jsmin>
+    
+    <copy file="${timeline_api}/timeline-bundle${suffix}.css" tofile="${timeline_compilations}/timeline-${locale}-compilation${suffix}.css" />
+  </target>
+  
+  <target name="compile-timeline-locale">
+    <antcall target="compile-timeline">
+        <param name="locale" value="${locale}" />
+        <param name="suffix" value="" />
+        <param name="obfuscate" value="true" />
+    </antcall>
+    <antcall target="compile-timeline">
+        <param name="locale" value="${locale}" />
+        <param name="suffix" value="-debug" />
+        <param name="obfuscate" value="false" />
+    </antcall>
+  </target>
+  
+  <target name="compile" depends="bundle">
+    <!-- SimileAjax -->
+    <antcall target="compile-ajax">
+        <param name="suffix" value="" />
+        <param name="obfuscate" value="true" />
+    </antcall>
+    <antcall target="compile-ajax">
+        <param name="suffix" value="-debug" />
+        <param name="obfuscate" value="false" />
+    </antcall>
+    
+    <!-- Timeline -->
+    <antcall target="compile-timeline-locale"><param name="locale" value="en" /></antcall>
+  </target>
+  
+  <!-- Create full distribution -->
+  <target name="prepare_full_dist" depends="bundle">
+
+    <mkdir dir="${full_dest}"/>
+
+    <copy todir="${full_dest}/lib">
+      <fileset dir="lib" excludes="**/.svn/**, **/*.bak" />
+    </copy>
+    <copy todir="${full_dest}/src">
+      <fileset dir="src" excludes="**/.svn/**, **/*.bak" />
+    </copy>
+    <copy todir="${full_dest}/tools">
+      <fileset dir="tools" excludes="**/.svn/**, **/*.bak" />
+    </copy>
+    
+    <copy file=".project" todir="${full_dest}" />
+    <copy file="build.xml" todir="${full_dest}" />
+    <copy file="CHANGES.txt" todir="${full_dest}" />
+    <copy file="jetty.xml" todir="${full_dest}" />
+    <copy file="LICENSE.txt" todir="${full_dest}" />
+    <copy file="README.txt" todir="${full_dest}" />
+    <copy file="run" todir="${full_dest}" />
+    <copy file="run.bat" todir="${full_dest}" />
+  </target>
+  
+  <target name="full_dist" depends="prepare_full_dist">
+    <zip destfile="timeline_${version}.zip"
+         basedir="."
+         update="yes"
+         duplicate="fail"
+         includes="${full_dest}/**"
+    />  
+    <tar destfile="timeline_${version}.tar.gz" compression="gzip" longfile="gnu"
+         basedir="."
+         includes="${full_dest}/**"
+    />
+  </target>
+
+  <!-- Create versioned timeline dir with just bundled libraries and support files -->
+  <target name="prepare_minimal_dist" depends="bundle">
+
+    <!-- timeline files -->
+
+    <copy file="${timeline_api}/timeline-api.js"     todir="${min_dest}" />
+    <copy file="${timeline_api}/timeline-bundle.js"  todir="${min_dest}" />
+    <copy file="${timeline_api}/timeline-bundle.css" todir="${min_dest}" />
+
+    <copy todir="${min_dest}/images">
+      <fileset dir="${timeline_api}/images" excludes="**/.svn/**, **/*.bak" />
+    </copy>
+    
+    <copy todir="${min_dest}/scripts/l10n">
+      <fileset dir="${timeline_api}/scripts/l10n" excludes="**/.svn/**, **/*.bak" />
+    </copy>
+    
+    <!-- ajax files -->
+    
+    <copy file="${ajax_api}/simile-ajax-api.js"    todir="${min_dest}/ajax" />
+    <copy file="${ajax_api}/simile-ajax-bundle.js" todir="${min_dest}/ajax" />
+    
+    <copy todir="${min_dest}/ajax/images">
+      <fileset dir="${ajax_api}/images" excludes="**/.svn/**, **/*.bak" />
+    </copy>
+    <copy todir="${min_dest}/ajax/styles">
+      <fileset dir="${ajax_api}/styles" excludes="**/.svn/**, **/*.bak" />
+    </copy>
+    <copy todir="${min_dest}/ajax/content">
+      <fileset dir="${ajax_api}/content" excludes="**/.svn/**, **/*.bak" />
+    </copy>
+
+    <copy file="${ajax_api}/scripts/signal.js" todir="${min_dest}/ajax/scripts" />
+    
+    <!-- release files -->
+    
+    <copy file="CHANGES.txt"     todir="${min_dest}" />
+    <copy file="LICENSE.txt"     todir="${min_dest}" />
+    <copy file="MIN_README.txt"  todir="${min_dest}" />
+  </target>
+  
+  <target name="minimal_dist" depends="prepare_minimal_dist">
+    <zip destfile="timeline_${version}_minimal.zip"
+         basedir="."
+         update="yes"
+         duplicate="fail"
+         includes="${min_dest}/**"
+    />  
+    <tar destfile="timeline_${version}_minimal.tar.gz" compression="gzip" longfile="gnu"
+         basedir="."
+         includes="${min_dest}/**"
+    />
+  </target>
+
+  <target name="dist" depends="full_dist, minimal_dist" />
+  
+  <target name="distclean">
+    <delete dir="dist"/>
+    <delete dir="htdocs"/>
+    <delete>
+        <fileset dir="." includes="*.gz"/>
+        <fileset dir="." includes="*.zip"/>
+    </delete>
+  </target>
+  
+</project>
