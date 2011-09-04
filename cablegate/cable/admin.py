@@ -11,5 +11,6 @@ class CableAdmin(admin.ModelAdmin):
     list_display = ('id', 'date', 'refid', 'classification', 'origin')
     list_filter = ('classification', 'origin')
     date_hierarchy = 'date'
+    search_fields = ('content',)
 
 admin.site.register(Cable, CableAdmin)
