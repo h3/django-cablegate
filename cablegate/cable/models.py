@@ -6,12 +6,16 @@ from django.utils import simplejson
 from django.db import models
 
 from nltk.tokenize.simple import SpaceTokenizer
+from nltk.stem import LancasterStemmer
 
 WORDS_IGNORED = (
     'after', 'that', 'with', 'which', 'into', 'when', 'than', 'them', 'there', 'threw',
 )
 
 splitwords = SpaceTokenizer()
+
+# http://code.google.com/p/nltk/source/browse/trunk/nltk/nltk/stem/lancaster.py
+stemmer = LancasterStemmer()
 
 class Cable(models.Model):
     id              = models.AutoField(primary_key=True)
@@ -55,21 +59,40 @@ class CableMetadata(models.Model):
         """
         if not self.words_count or getattr(settings, 'DEV', False):
             wordcounts = {}
+            stems = {}
             out = []
             content = re.sub("\n|\(|\)|\.|\d+|---+", "", self.cable.content)
             words = splitwords.tokenize(content.lower())
 
             # Calculate
+
+            for word in words:
+                stem = stemmer.stem(word)
+                if stem != word:
+                    occ = 0
+                    while stem in words:
+                        words.remove(stem)
+                        occ = occ + 1
+                    if occ > 0:
+                        stems[word] = (stem, occ)
+
             for word in words:
                 if len(word) > minlen and word not in WORDS_IGNORED:
                     if word not in wordcounts:
                          wordcounts[word] = 0
                     wordcounts[word] += 1
+
+            for word in wordcounts:
+                if word in stems:
+                    wordcounts[word] = wordcounts[word] + stems[word][1]
             
             # Skim
             for word in wordcounts:
                 if wordcounts[word] >= mincount:
-                    out.append((word, wordcounts[word]))
+                    label = word
+                    if word in stems:
+                        label = '%s/%s' % (word, stems[word][0])
+                    out.append((label, wordcounts[word]))
 
             # Sord and save
             out = sorted(out, key=lambda i: i[1], reverse=True)
@@ -77,6 +100,7 @@ class CableMetadata(models.Model):
             self.save()
         return simplejson.loads(self.words_count)
 
+    
     def get_words_freqdist(self, num=25):
         """
         Returns the words and their counts, in order of decreasing frequency.
