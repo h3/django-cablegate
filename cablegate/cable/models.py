@@ -1,13 +1,17 @@
 import re
 from operator import itemgetter
 
+from django.conf import settings
 from django.utils import simplejson
 from django.db import models
+
+from nltk.tokenize.simple import SpaceTokenizer
 
 WORDS_IGNORED = (
     'after', 'that', 'with', 'which', 'into', 'when', 'than', 'them', 'there', 'threw',
 )
 
+splitwords = SpaceTokenizer()
 
 class Cable(models.Model):
     id              = models.AutoField(primary_key=True)
@@ -49,27 +53,28 @@ class CableMetadata(models.Model):
         Count the number of times each word has appeared.
         Based on http://code.google.com/p/nltk/source/browse/trunk/nltk/examples/school/words.py
         """
-       #if not self.words_count:
-        wordcounts = {}
-        out = []
-        words = re.split('\W+', self.cable.content.lower())
-        # Calculate
-        for word in words:
-            if len(word) > minlen and word not in WORDS_IGNORED:
-                if word not in wordcounts:
-                     wordcounts[word] = 0
-                wordcounts[word] += 1
+        if not self.words_count or getattr(settings, 'DEV', False):
+            wordcounts = {}
+            out = []
+            content = re.sub("\n|\(|\)|\.|\d+|---+", "", self.cable.content)
+            words = splitwords.tokenize(content.lower())
 
+            # Calculate
+            for word in words:
+                if len(word) > minlen and word not in WORDS_IGNORED:
+                    if word not in wordcounts:
+                         wordcounts[word] = 0
+                    wordcounts[word] += 1
+            
+            # Skim
+            for word in wordcounts:
+                if wordcounts[word] >= mincount:
+                    out.append((word, wordcounts[word]))
 
-        # Skim
-        for word in wordcounts:
-            if wordcounts[word] >= mincount:
-                out.append((word, wordcounts[word]))
-
-        out = sorted(out, key=lambda i: i[1], reverse=True)
-
-        self.words_count  = simplejson.dumps(out)
-        self.save()
+            # Sord and save
+            out = sorted(out, key=lambda i: i[1], reverse=True)
+            self.words_count  = simplejson.dumps(out)
+            self.save()
         return simplejson.loads(self.words_count)
 
     def get_words_freqdist(self, num=25):
