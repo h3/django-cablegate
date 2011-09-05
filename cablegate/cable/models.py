@@ -43,36 +43,43 @@ class CableMetadata(models.Model):
     destination_lat = models.CharField(max_length=250, blank=True, null=True)
     destination_lon = models.CharField(max_length=250, blank=True, null=True)
 
+
     def get_words_count(self, minlen=4, mincount=3):
         """
         Count the number of times each word has appeared.
         Based on http://code.google.com/p/nltk/source/browse/trunk/nltk/examples/school/words.py
         """
-        if not self.words_count:
-            wordcounts = {}
-            out = {}
-            words = re.split('\W+', self.cable.content.lower())
-            for word in words:
-                if len(word) > minlen and word not in WORDS_IGNORED:
-                    if word not in wordcounts:
-                         wordcounts[word] = 0
-                    wordcounts[word] += 1
+       #if not self.words_count:
+        wordcounts = {}
+        out = []
+        words = re.split('\W+', self.cable.content.lower())
+        # Calculate
+        for word in words:
+            if len(word) > minlen and word not in WORDS_IGNORED:
+                if word not in wordcounts:
+                     wordcounts[word] = 0
+                wordcounts[word] += 1
 
-            for word in wordcounts:
-                if wordcounts[word] >= mincount:
-                    out[word] = wordcounts[word]
-            self.words_count  = simplejson.dumps(out)
-            self.save()
-        return self.words_count
+
+        # Skim
+        for word in wordcounts:
+            if wordcounts[word] >= mincount:
+                out.append((word, wordcounts[word]))
+
+        out = sorted(out, key=lambda i: i[1], reverse=True)
+
+        self.words_count  = simplejson.dumps(out)
+        self.save()
+        return simplejson.loads(self.words_count)
 
     def get_words_freqdist(self, num=25):
         """
-        Print the words and their counts, in order of decreasing frequency.
+        Returns the words and their counts, in order of decreasing frequency.
         Based on http://code.google.com/p/nltk/source/browse/trunk/nltk/examples/school/words.py
         """
         if not self.words_freqdist:
             out = {}
-            counts = simplejson.loads(self.get_words_count())
+            counts = self.get_words_count()
             total  = sum(counts.values())
             cumulative = 0.0
             sorted_word_counts = sorted(counts.items(), key=itemgetter(1), reverse=True)

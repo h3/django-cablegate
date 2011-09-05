@@ -1,3 +1,36 @@
-{{ object.cablemetadata.get_words_count }}
-<br>
-{{ object.cablemetadata.get_words_freqdist }}
+{% load markup %}
+<html>
+  <head>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      google.load("visualization", "1", {packages:["corechart"]});
+      google.setOnLoadCallback(drawChart);
+      function drawChart() {
+        var data = new google.visualization.DataTable();
+        data.addColumn('string', 'Word');
+        data.addColumn('number', 'Occurences');
+        data.addRows(10);
+         
+        {% for word, count in object.cablemetadata.get_words_count|slice:"10" %}
+        data.setValue({{ forloop.counter0 }}, 0, "{{ word }}");
+        data.setValue({{ forloop.counter0 }}, 1, {{ count }});
+        {% endfor %}
+
+        var chart = new google.visualization.BarChart(document.getElementById('chart_div'));
+      //var chart = new google.visualization.PieChart(document.getElementById('chart_div'));
+        chart.draw(data, {
+            width: 450, 
+            height: 300, 
+            legend: 'none',
+            titleTextStyle: {color: '#cc3300'},
+            title: 'Top words occurence'
+        });
+      }
+    </script>
+  </head>
+
+  <body>
+    <div id="chart_div"></div>
+    <pre>{{ object.content }}</pre>
+  </body>
+</html>

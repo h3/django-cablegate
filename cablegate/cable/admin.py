@@ -11,7 +11,6 @@ from cablegate.cable.models import Cable, CableMetadata
 class CableMetadataInline(admin.StackedInline):
     model = CableMetadata
 
-
 class CableAdmin(admin.ModelAdmin):
     list_display = ('id', 'date', 'refid', 'classification', 'origin')
     list_filter = ('classification', 'origin')
@@ -20,3 +19,7 @@ class CableAdmin(admin.ModelAdmin):
     inlines = [CableMetadataInline]
 
 admin.site.register(Cable, CableAdmin)
+
+class CableMetadataAdmin(admin.ModelAdmin):
+    pass
+admin.site.register(CableMetadata, CableMetadataAdmin)
